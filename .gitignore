@@ -1,3 +1,4 @@
 *.iml
 .idea
 database/database.db
+virt_env
