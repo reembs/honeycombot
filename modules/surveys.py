@@ -2,6 +2,8 @@ from modules.base_module import BaseModule
 from telegram import ForceReply, ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
 
 from session import SessionDiscard
+import database
+import time
 
 
 # noinspection PyMethodMayBeStatic
@@ -9,6 +11,7 @@ def format_opts(opts):
     f = ""
     for opt in opts:
         f += opt + "\n"
+    return f
 
 
 class SurveysModule(BaseModule):
@@ -32,7 +35,10 @@ class SurveysModule(BaseModule):
         },
         'preview': {
             'preview': True
-        }
+        },
+        'send': {
+            'sendPressed': True
+        },
     }
 
     def __init__(self):
@@ -46,7 +52,25 @@ class SurveysModule(BaseModule):
             'options_completed': False,
             'question': None,
             'options': [],
+            'sendPressed': False,
+            'userId': update.effective_message.from_user.id,
+            'userName': update.effective_message.from_user.name,
         }
+
+    def prompt(self, session, bot, chat_id):
+        if not session['question']:
+            bot.send_message(chat_id=chat_id, text=self.get_survey_question_text, parse_mode=ParseMode.HTML)
+        elif not session['options_completed']:
+            self.send_get_option_msg(bot, chat_id)
+
+        if session['sendPressed']:
+            res_set = database.query_r('SELECT group_name, group_id FROM user_groups WHERE user_id=?', session['userId'])
+            bot.send_message(chat_id=chat_id, text="Where should the survey be posted?", parse_mode=ParseMode.HTML, reply_markup=
+                             self.create_send_chice_keyboard(session, res_set))
+
+        else:
+            bot.send_message(chat_id=chat_id, text="What would you like to do next?", parse_mode=ParseMode.HTML, reply_markup=
+                             self.create_options_keyboard(session))
 
     def handle_message(self, session, bot, update):
         message = update.message
@@ -55,38 +79,91 @@ class SurveysModule(BaseModule):
         if not session['question']:
             if message and message.text:
                 session['question'] = message.text
-                self.send_get_option_msg(bot, chat_id)
-            else:
-                bot.send_message(chat_id=chat_id, text=self.get_survey_question_text, parse_mode=ParseMode.HTML)
         elif not session['options_completed']:
             survey_option = message.text
             if survey_option.lower() not in ['!', 'done']:
                 session['options'].append(survey_option)
-                self.send_get_option_msg(bot, chat_id)
             else:
                 session['options_completed'] = True
 
-        bot.send_message(chat_id=chat_id, text="Options", parse_mode=ParseMode.HTML, reply_markup=
-        self.create_options_keyboard(session))
+        self.prompt(session, bot, chat_id)
 
     def send_get_option_msg(self, bot, chat_id):
         bot.send_message(chat_id=chat_id, text=self.enter_survey_option, parse_mode=ParseMode.HTML)
 
+    def handle_async_callback(self, bot, update, query):
+        if update.callback_query and query and query.startswith('opt_ans_'):
+            uid = update.effective_user.id
+            gid = update.effective_chat.id
+            opt_id = int(query.split('opt_ans_')[1])
+
+            sid, t_gid = database.query_r('SELECT s.survey_id, s.group_id'
+                                          '  FROM survey_options o, surveys s '
+                                          ' WHERE o.survey_id = s.survey_id '
+                                          '   AND option_id=?', opt_id)[0]
+
+            if t_gid == gid:
+                aid, oid, opt_text = database.query_r(
+                    'SELECT s.answer_id, s.option_id, o.option_text'
+                    '  FROM survey_answers s, survey_options o '
+                    ' WHERE s.user_id = ? AND s.survey_id = ?'
+                    '   AND o.option_id=s.option_id', uid, sid)[0]
+
+                if not aid:
+                    database.query_w('INSERT INTO survey_answers (option_id, survey_id, user_id) '
+                                     'VALUES (?, ?, ?)', opt_id, sid, uid)
+                else:
+                    pass  # todo: notify user / change vote?
+
     def handle_callback(self, session, bot, update):
         if update.callback_query:
             chat_id = update.effective_chat.id
-            data = self.callback_dict[update.callback_query.data]
+            query_data = update.callback_query.data
+
+            if query_data == 'send_back':
+                session['sendPressed'] = False
+            elif query_data.startswith('send_'):
+                gid = int(query_data.split('_')[1])
+
+                sid = database.insert_auto_inc(
+                    'INSERT INTO surveys (user_id, group_id, survey_question, created, valid) '
+                    'VALUES (?, ?, ?, ?, 1)', session['userId'], gid, session['question'], int(time.time()))
+
+                opt_ids = []
+                for opt in session['options']:
+                    opt_ids.append(database.insert_auto_inc(
+                        'INSERT INTO survey_options (survey_id, option_text) '
+                        'VALUES (?, ?)', sid, opt))
+
+                bot.send_message(gid, session['userName'] + " has created a new survey: " + session['question'],
+                                 reply_markup=self.display_survey_to_group(session, opt_ids))
+                return
+
+            data = self.callback_dict[query_data]
             if 'discard' in data:
                 raise SessionDiscard()
-            if 'preview' in data:
-                bot.send_message(chat_id=chat_id, text="Question: {}, Options:\n{}".format(session['question'], format_opts(session['options'])), parse_mode=ParseMode.HTML,
-                                 reply_markup=self.create_options_keyboard(session))
-                bot.send_message(chat_id=chat_id, text="Options", parse_mode=ParseMode.HTML, reply_markup=self.create_options_keyboard(session))
+            elif 'preview' in data:
+                bot.send_message(
+                    chat_id=chat_id,
+                    text="Question: {}\nOptions:\n{}".format(
+                        session['question'], format_opts(session['options'])), parse_mode=ParseMode.HTML)
             else:
                 session.update(data)
 
+            self.prompt(session, bot, chat_id)
+
     def create(self):
         pass
+
+    def create_send_chice_keyboard(self, session, res_set):
+        buttons_list = []
+
+        for name, gid in res_set:
+            buttons_list.append([
+                InlineKeyboardButton(text=name, callback_data='send_' + str(gid))
+            ])
+
+        return InlineKeyboardMarkup(buttons_list)
 
     def create_options_keyboard(self, session):
         buttons_list = []
@@ -109,6 +186,19 @@ class SurveysModule(BaseModule):
             InlineKeyboardButton(text='Preview', callback_data='preview')
         )
 
-        keyboard = InlineKeyboardMarkup([buttons_list])
+        if session['question'] and session['options_completed']:
+            buttons_list.append(
+                InlineKeyboardButton(text='Send', callback_data='send')
+            )
 
-        return keyboard
+        return InlineKeyboardMarkup([buttons_list])
+
+    def display_survey_to_group(self, session, opt_ids):
+        buttons_list = []
+
+        for i, opt in enumerate(session['options']):
+            buttons_list.append([
+                InlineKeyboardButton(text=opt, callback_data='m[{}]opt_ans_{}'.format(self.command_name, opt_ids[i]))
+            ])
+
+        return InlineKeyboardMarkup(buttons_list)

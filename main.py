@@ -26,26 +26,28 @@ def main():
     # define the dispatcher
     dp = updater.dispatcher
 
-    sessions = Sessions()
-
     bot_module = SurveysModule()
     bot_module.create()
+
+    bot_modules = [bot_module]
+    sessions = Sessions(bot_modules)
 
     if not bot_module.command_name:
         raise Exception('Invalid handlers detected')
 
-    dp.add_handler(CommandHandler(bot_module.command_name, sessions.wrap_session_creation(bot_module)))
+    for bot_module in bot_modules:
+        dp.add_handler(CommandHandler(bot_module.command_name, sessions.wrap_session_creation(bot_module)))
 
     # messages
     dp.add_handler(MessageHandler(Filters.all, messages.before_processing), -1)
 
     # commands
     dp.add_handler(CommandHandler(('start', 'help'), commands.help_command))
-    dp.add_handler(CallbackQueryHandler(sessions.wrap_message_callback(bot_module)))
+    dp.add_handler(CallbackQueryHandler(sessions.wrap_message_callback()))
 
     dp.add_handler(MessageHandler(Filters.command, utils.invalid_command))
     # messages
-    dp.add_handler(MessageHandler(~Filters.command, sessions.wrap_message_session(bot_module), edited_updates=True))
+    dp.add_handler(MessageHandler(~Filters.command, sessions.wrap_message_session(), edited_updates=True))
 
     # handle errors
     dp.add_error_handler(error)

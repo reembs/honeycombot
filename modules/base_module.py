@@ -15,3 +15,6 @@ class BaseModule:
 
     def handle_callback(self, session, bot, update):
         pass
+
+    def handle_async_callback(self, bot, update, query):
+        pass

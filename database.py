@@ -5,7 +5,7 @@ import utils
 
 
 def connect():
-    conn = sqlite3.connect("database/" + configfile.db_name)
+    conn = sqlite3.connect(configfile.db_name)
     c = conn.cursor()
     return (conn, c)
 
@@ -15,6 +15,16 @@ def query_w(query, *params):
     c.execute(query, params)
     conn.commit()
     conn.close()
+
+
+def insert_auto_inc(query, *params):
+    conn, c = connect()
+    try:
+        c.execute(query, params)
+        conn.commit()
+        return c.lastrowid
+    finally:
+        conn.close()
 
 
 def query_r(query, *params, one=False):
@@ -44,10 +54,10 @@ def create_db():
     query_w(query)
     query = "CREATE INDEX IF NOT EXISTS survey_options_survey_id_index on survey_options (survey_id)"
     query_w(query)
-
-
-def add_survay(user_id, group_id, survey_question):
-    pass
+    query = "CREATE TABLE IF NOT EXISTS survey_answers(answer_id INTEGER PRIMARY KEY AUTOINCREMENT, option_id INTEGER, survey_id INTEGER, user_id INTEGER)"
+    query_w(query)
+    query = "CREATE INDEX IF NOT EXISTS survey_answers_survey_id_index on survey_options (survey_id)"
+    query_w(query)
 
 
 def add_user_group(user_id, group_id, group_name, joined_time):
