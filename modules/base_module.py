@@ -1,6 +1,6 @@
 class BaseModule:
     bot_module_name = None
-    commands = []
+    name = None
 
     def __init__(self):
         pass

@@ -14,14 +14,13 @@ def format_opts(opts):
     return f
 
 
-class SurveysModule(BaseModule):
+class StartSurveyModule(BaseModule):
     start_survey_text = 'Start a survey'
     get_survey_question_text = 'Enter a survey question'
     enter_survey_option = 'Enter a survey answer, type "done" or "!" to finish'
 
     bot_module_name = 'survey'
-    commands = ['survey', 'results']
-    name = 'Surveys'
+    name = 'Create Survey'
 
     callback_dict = {
         'editq': {
@@ -47,20 +46,16 @@ class SurveysModule(BaseModule):
 
     def handle_command(self, bot, update):
         chat_id = update.effective_chat.id
-
-        if update.effective_message.text == '/survey':
-            bot.send_message(chat_id=chat_id, text=self.get_survey_question_text, parse_mode=ParseMode.HTML)
-            return {
-                'survey_completed': False,
-                'options_completed': False,
-                'question': None,
-                'options': [],
-                'sendPressed': False,
-                'userId': update.effective_message.from_user.id,
-                'userName': update.effective_message.from_user.name,
-            }
-        elif update.effective_message.text == '/results':
-            pass
+        bot.send_message(chat_id=chat_id, text=self.get_survey_question_text, parse_mode=ParseMode.HTML)
+        return {
+            'survey_completed': False,
+            'options_completed': False,
+            'question': None,
+            'options': [],
+            'sendPressed': False,
+            'userId': update.effective_message.from_user.id,
+            'userName': update.effective_message.from_user.name,
+        }
 
     def prompt(self, session, bot, chat_id):
         if not session['question']:

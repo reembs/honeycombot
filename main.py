@@ -6,7 +6,8 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 import messages
 import utils
 from config import configfile
-from modules.surveys import SurveysModule
+from modules.start_survey import StartSurveyModule
+from modules.survey_results import SurveyResultsModule
 from session import Sessions
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -29,17 +30,19 @@ def main():
     # define the dispatcher
     dp = updater.dispatcher
 
-    bot_module = SurveysModule()
-    bot_module.create()
+    bmod = StartSurveyModule()
+    bmod.create()
 
-    bot_modules = [bot_module]
+    surv_res = SurveyResultsModule()
+    surv_res.create()
+
+    bot_modules = [bmod, surv_res]
     sessions = Sessions(bot_modules)
 
-    if not bot_module.bot_module_name:
-        raise Exception('Invalid handlers detected')
-
-    for bot_module in bot_modules:
-        dp.add_handler(CommandHandler(bot_module.commands, sessions.wrap_session_creation(bot_module)))
+    for bmod in bot_modules:
+        if not bmod.bot_module_name:
+            raise Exception('Invalid handlers detected')
+        dp.add_handler(CommandHandler(bmod.bot_module_name, sessions.wrap_session_creation(bmod)))
 
     # messages
     dp.add_handler(MessageHandler(Filters.all, messages.before_processing), -1)
