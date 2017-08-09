@@ -14,6 +14,7 @@ def get_int_time(update):
 
 def before_processing(bot, update):
     user_id = update.effective_message.from_user.id
+    username = update.effective_message.from_user.username
     int_time = get_int_time(update)
     if update.effective_chat.type != "private":
         chat_id = update.effective_chat.id
@@ -24,7 +25,7 @@ def before_processing(bot, update):
             text = "Address me privately, please"
             update.effective_message.reply_text(text=text, reply_markup=keyboard)
         update.message = None
-    database.add_user_db(user_id, int_time)
+    database.add_user_db(user_id, username, int_time)
 
 
 def process_message(bot, update):

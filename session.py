@@ -45,7 +45,7 @@ class Sessions:
                     if match:
                         module_name = match.group(1)
                         for m in self.modules:
-                            if m.command_name == module_name:
+                            if m.bot_module_name == module_name:
                                 m.handle_async_callback(bot, update, match.group(2))
                                 break
         return wrapper

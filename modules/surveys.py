@@ -19,7 +19,8 @@ class SurveysModule(BaseModule):
     get_survey_question_text = 'Enter a survey question'
     enter_survey_option = 'Enter a survey answer, type "done" or "!" to finish'
 
-    command_name = 'survey'
+    bot_module_name = 'survey'
+    commands = ['survey', 'results']
     name = 'Surveys'
 
     callback_dict = {
@@ -46,16 +47,20 @@ class SurveysModule(BaseModule):
 
     def handle_command(self, bot, update):
         chat_id = update.effective_chat.id
-        bot.send_message(chat_id=chat_id, text=self.get_survey_question_text, parse_mode=ParseMode.HTML)
-        return {
-            'survey_completed': False,
-            'options_completed': False,
-            'question': None,
-            'options': [],
-            'sendPressed': False,
-            'userId': update.effective_message.from_user.id,
-            'userName': update.effective_message.from_user.name,
-        }
+
+        if update.effective_message.text == '/survey':
+            bot.send_message(chat_id=chat_id, text=self.get_survey_question_text, parse_mode=ParseMode.HTML)
+            return {
+                'survey_completed': False,
+                'options_completed': False,
+                'question': None,
+                'options': [],
+                'sendPressed': False,
+                'userId': update.effective_message.from_user.id,
+                'userName': update.effective_message.from_user.name,
+            }
+        elif update.effective_message.text == '/results':
+            pass
 
     def prompt(self, session, bot, chat_id):
         if not session['question']:
@@ -66,7 +71,7 @@ class SurveysModule(BaseModule):
         if session['sendPressed']:
             res_set = database.query_r('SELECT group_name, group_id FROM user_groups WHERE user_id=?', session['userId'])
             bot.send_message(chat_id=chat_id, text="Where should the survey be posted?", parse_mode=ParseMode.HTML, reply_markup=
-                             self.create_send_chice_keyboard(session, res_set))
+                             self.create_send_choice_keyboard(session, res_set))
 
         else:
             bot.send_message(chat_id=chat_id, text="What would you like to do next?", parse_mode=ParseMode.HTML, reply_markup=
@@ -93,69 +98,85 @@ class SurveysModule(BaseModule):
 
     def handle_async_callback(self, bot, update, query):
         if update.callback_query and query and query.startswith('opt_ans_'):
-            uid = update.effective_user.id
-            gid = update.effective_chat.id
-            opt_id = int(query.split('opt_ans_')[1])
+            answered = False
+            try:
+                uid = update.effective_user.id
+                gid = update.effective_chat.id
+                opt_id = int(query.split('opt_ans_')[1])
 
-            sid, t_gid = database.query_r('SELECT s.survey_id, s.group_id'
-                                          '  FROM survey_options o, surveys s '
-                                          ' WHERE o.survey_id = s.survey_id '
-                                          '   AND option_id=?', opt_id)[0]
+                sid, t_gid = database.query_r('SELECT s.survey_id, s.group_id'
+                                              '  FROM survey_options o, surveys s '
+                                              ' WHERE o.survey_id = s.survey_id '
+                                              '   AND option_id=?', opt_id)[0]
 
-            if t_gid == gid:
-                aid, oid, opt_text = database.query_r(
-                    'SELECT s.answer_id, s.option_id, o.option_text'
-                    '  FROM survey_answers s, survey_options o '
-                    ' WHERE s.user_id = ? AND s.survey_id = ?'
-                    '   AND o.option_id=s.option_id', uid, sid)[0]
+                answered = True
+                if t_gid == gid:
+                    rows = database.query_r(
+                        'SELECT s.answer_id'
+                        '  FROM survey_answers s, survey_options o '
+                        ' WHERE s.user_id = ? AND s.survey_id = ?'
+                        '   AND o.option_id=s.option_id', uid, sid)
 
-                if not aid:
-                    database.query_w('INSERT INTO survey_answers (option_id, survey_id, user_id) '
-                                     'VALUES (?, ?, ?)', opt_id, sid, uid)
+                    if not rows:
+                        database.query_w('INSERT INTO survey_answers (option_id, survey_id, user_id) '
+                                         'VALUES (?, ?, ?)', opt_id, sid, uid)
+                        action = 'submitted'
+                    else:
+                        database.query_w('UPDATE survey_answers SET option_id=? '
+                                         ' WHERE answer_id=?', opt_id, rows[0][0])
+                        action = 'updated'
+
+                    bot.answerCallbackQuery(update.callback_query.id, text='Your selection was {}'.format(action))
                 else:
-                    pass  # todo: notify user / change vote?
+                    bot.answerCallbackQuery(update.callback_query.id, text='Failure to submit')
+            finally:
+                if not answered:
+                    bot.answerCallbackQuery(update.callback_query.id)
 
     def handle_callback(self, session, bot, update):
         if update.callback_query:
-            chat_id = update.effective_chat.id
-            query_data = update.callback_query.data
+            try:
+                chat_id = update.effective_chat.id
+                query_data = update.callback_query.data
 
-            if query_data == 'send_back':
-                session['sendPressed'] = False
-            elif query_data.startswith('send_'):
-                gid = int(query_data.split('_')[1])
+                if query_data == 'send_back':
+                    session['sendPressed'] = False
+                elif query_data.startswith('send_'):
+                    gid = int(query_data.split('_')[1])
 
-                sid = database.insert_auto_inc(
-                    'INSERT INTO surveys (user_id, group_id, survey_question, created, valid) '
-                    'VALUES (?, ?, ?, ?, 1)', session['userId'], gid, session['question'], int(time.time()))
+                    sid = database.insert_auto_inc(
+                        'INSERT INTO surveys (user_id, group_id, survey_question, created, valid) '
+                        'VALUES (?, ?, ?, ?, 1)', session['userId'], gid, session['question'], int(time.time()))
 
-                opt_ids = []
-                for opt in session['options']:
-                    opt_ids.append(database.insert_auto_inc(
-                        'INSERT INTO survey_options (survey_id, option_text) '
-                        'VALUES (?, ?)', sid, opt))
+                    opt_ids = []
+                    for opt in session['options']:
+                        opt_ids.append(database.insert_auto_inc(
+                            'INSERT INTO survey_options (survey_id, option_text) '
+                            'VALUES (?, ?)', sid, opt))
 
-                bot.send_message(gid, session['userName'] + " has created a new survey: " + session['question'],
-                                 reply_markup=self.display_survey_to_group(session, opt_ids))
-                return
+                    bot.send_message(gid, session['userName'] + " has created a new survey: " + session['question'],
+                                     reply_markup=self.display_survey_to_group(session, opt_ids))
+                    return
 
-            data = self.callback_dict[query_data]
-            if 'discard' in data:
-                raise SessionDiscard()
-            elif 'preview' in data:
-                bot.send_message(
-                    chat_id=chat_id,
-                    text="Question: {}\nOptions:\n{}".format(
-                        session['question'], format_opts(session['options'])), parse_mode=ParseMode.HTML)
-            else:
-                session.update(data)
+                data = self.callback_dict[query_data]
+                if 'discard' in data:
+                    raise SessionDiscard()
+                elif 'preview' in data:
+                    bot.send_message(
+                        chat_id=chat_id,
+                        text="Question: {}\nOptions:\n{}".format(
+                            session['question'], format_opts(session['options'])), parse_mode=ParseMode.HTML)
+                else:
+                    session.update(data)
 
-            self.prompt(session, bot, chat_id)
+                self.prompt(session, bot, chat_id)
+            finally:
+                bot.answerCallbackQuery(update.callback_query.id)
 
     def create(self):
         pass
 
-    def create_send_chice_keyboard(self, session, res_set):
+    def create_send_choice_keyboard(self, session, res_set):
         buttons_list = []
 
         for name, gid in res_set:
@@ -198,7 +219,7 @@ class SurveysModule(BaseModule):
 
         for i, opt in enumerate(session['options']):
             buttons_list.append([
-                InlineKeyboardButton(text=opt, callback_data='m[{}]opt_ans_{}'.format(self.command_name, opt_ids[i]))
+                InlineKeyboardButton(text=opt, callback_data='m[{}]opt_ans_{}'.format(self.bot_module_name, opt_ids[i]))
             ])
 
         return InlineKeyboardMarkup(buttons_list)

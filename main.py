@@ -32,11 +32,11 @@ def main():
     bot_modules = [bot_module]
     sessions = Sessions(bot_modules)
 
-    if not bot_module.command_name:
+    if not bot_module.bot_module_name:
         raise Exception('Invalid handlers detected')
 
     for bot_module in bot_modules:
-        dp.add_handler(CommandHandler(bot_module.command_name, sessions.wrap_session_creation(bot_module)))
+        dp.add_handler(CommandHandler(bot_module.commands, sessions.wrap_session_creation(bot_module)))
 
     # messages
     dp.add_handler(MessageHandler(Filters.all, messages.before_processing), -1)

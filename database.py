@@ -40,7 +40,7 @@ def query_r(query, *params, one=False):
 
 
 def create_db():
-    query = "CREATE TABLE IF NOT EXISTS users(user_id INTEGER PRIMARY KEY, last_activity INTEGER)"
+    query = "CREATE TABLE IF NOT EXISTS users(user_id INTEGER PRIMARY KEY, user_name VARCHAR, last_activity INTEGER)"
     query_w(query)
     query = "CREATE TABLE IF NOT EXISTS user_groups(user_id INTEGER PRIMARY KEY, group_id INTEGER, group_name VARCHAR, joined INTEGER)"
     query_w(query)
@@ -67,10 +67,10 @@ def add_user_group(user_id, group_id, group_name, joined_time):
     query_w(query, user_id, group_id, group_name, joined_time)
 
 
-def add_user_db(user_id, time):
+def add_user_db(user_id, username, time):
     # try to update or ignore
-    query = "UPDATE OR IGNORE users SET last_activity = ? WHERE user_id = ?"
-    query_w(query, time, user_id)
+    query = "UPDATE OR IGNORE users SET last_activity = ?, user_name = ? WHERE user_id = ?"
+    query_w(query, time, username, user_id)
     # try to add or ignore
     query = "INSERT OR IGNORE INTO users(user_id, last_activity) VALUES (?, ?)"
     query_w(query, user_id, time)
