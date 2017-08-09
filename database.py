@@ -1,7 +1,6 @@
 import sqlite3
-import time
+
 from config import configfile
-import utils
 
 
 def connect():
@@ -74,24 +73,6 @@ def add_user_db(user_id, username, time):
     # try to add or ignore
     query = "INSERT OR IGNORE INTO users(user_id, last_activity) VALUES (?, ?)"
     query_w(query, user_id, time)
-
-
-def stats_text():
-    query = "SELECT count(user_id) FROM users"
-    total = query_r(query, one=True)[0]
-
-    interval24h = time.time() - 60 * 60 * 24
-    query = "SELECT count(user_id) FROM users WHERE last_activity > ?"
-    last24h = query_r(query, interval24h, one=True)[0]
-
-    interval7d = time.time() - 60 * 60 * 24 * 7
-    query = "SELECT count(user_id) FROM users WHERE last_activity > ?"
-    last7d = query_r(query, interval7d, one=True)[0]
-
-    text = "<b>Total users:</b> {0}\n<b>Last7days:</b> {1}\n<b>Last24h:</b> {2}"
-    text = text.format(utils.n_dots(total), utils.n_dots(last7d), utils.n_dots(last24h))
-    return text
-
 
 # create the database
 create_db()

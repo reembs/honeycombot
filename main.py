@@ -1,8 +1,8 @@
 import logging
 
+from telegram import ParseMode
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
-import commands
 import messages
 import utils
 from config import configfile
@@ -12,11 +12,14 @@ from session import Sessions
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-SLEEP_TIME_SECS = 5
-
 
 def error(bot, update, error):
     logger.warning('Update "%s" caused error "%s"' % (update, error))
+
+
+def help_command(bot, update):
+    text = "A bot for groups"
+    update.message.reply_text(text=text, parse_mode=ParseMode.HTML)
 
 
 def main():
@@ -42,7 +45,7 @@ def main():
     dp.add_handler(MessageHandler(Filters.all, messages.before_processing), -1)
 
     # commands
-    dp.add_handler(CommandHandler(('start', 'help'), commands.help_command))
+    dp.add_handler(CommandHandler(('start', 'help'), help_command))
     dp.add_handler(CallbackQueryHandler(sessions.wrap_message_callback()))
 
     dp.add_handler(MessageHandler(Filters.command, utils.invalid_command))
