@@ -69,7 +69,22 @@ class SurveyResultsModule(BaseModule):
                 bot.answerCallbackQuery(update.callback_query.id)
 
     def create(self):
-        pass
+        database.query_w(
+            "CREATE TABLE IF NOT EXISTS surveys(survey_id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_id INTEGER, group_id INTEGER, survey_question VARCHAR, created INTEGER, valid TINYINT)")
+
+        database.query_w("CREATE INDEX IF NOT EXISTS surveys_user_id_index on surveys (user_id)")
+
+        database.query_w(
+            "CREATE TABLE IF NOT EXISTS survey_options(option_id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "survey_id INTEGER, option_text VARCHAR)")
+
+        database.query_w("CREATE INDEX IF NOT EXISTS survey_options_survey_id_index on survey_options (survey_id)")
+
+        database.query_w("CREATE TABLE IF NOT EXISTS survey_answers(answer_id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                         "option_id INTEGER, survey_id INTEGER, user_id INTEGER)")
+
+        database.query_w("CREATE INDEX IF NOT EXISTS survey_answers_survey_id_index on survey_options (survey_id)")
 
     def get_surveys_markup(self, res_set):
         buttons_list = []

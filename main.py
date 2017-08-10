@@ -3,8 +3,6 @@ import logging
 from telegram import ParseMode
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
-import messages
-import utils
 from config import configfile
 from modules.start_survey import StartSurveyModule
 from modules.survey_results import SurveyResultsModule
@@ -23,41 +21,32 @@ def help_command(bot, update):
     update.message.reply_text(text=text, parse_mode=ParseMode.HTML)
 
 
-def main():
-    #  define the updater
-    updater = Updater(token=configfile.bot_token)
+def invalid_command(bot, update):
+    text = "I don't know what that means"
+    update.message.reply_text(text=text, quote=True)
 
-    # define the dispatcher
+
+def main():
+    updater = Updater(token=configfile.bot_token)
     dp = updater.dispatcher
 
-    bmod = StartSurveyModule()
-    bmod.create()
+    bot_modules = [SurveyResultsModule(), SurveyResultsModule()]
 
-    surv_res = SurveyResultsModule()
-    surv_res.create()
+    for bot_module in bot_modules:
+        bot_module.create()
 
-    bot_modules = [bmod, surv_res]
     sessions = Sessions(bot_modules)
 
-    for bmod in bot_modules:
-        if not bmod.bot_module_name:
+    for bot_module in bot_modules:
+        if not bot_module.bot_module_name:
             raise Exception('Invalid handlers detected')
-        dp.add_handler(CommandHandler(bmod.bot_module_name, sessions.wrap_session_creation(bmod)))
+        dp.add_handler(CommandHandler(bot_module.bot_module_name, sessions.wrap_session_creation(bot_module)))
 
-    # messages
-    dp.add_handler(MessageHandler(Filters.all, messages.before_processing), -1)
-
-    # commands
     dp.add_handler(CommandHandler(('start', 'help'), help_command))
     dp.add_handler(CallbackQueryHandler(sessions.wrap_message_callback()))
-
-    dp.add_handler(MessageHandler(Filters.command, utils.invalid_command))
-    # messages
+    dp.add_handler(MessageHandler(Filters.command, invalid_command))
     dp.add_handler(MessageHandler(~Filters.command, sessions.wrap_message_session(), edited_updates=True))
-
-    # handle errors
     dp.add_error_handler(error)
-
     updater.start_polling()
     updater.idle()
 
