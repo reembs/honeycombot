@@ -30,7 +30,7 @@ def main():
     updater = Updater(token=configfile.bot_token)
     dp = updater.dispatcher
 
-    bot_modules = [SurveyResultsModule(), SurveyResultsModule()]
+    bot_modules = [StartSurveyModule(), SurveyResultsModule()]
 
     for bot_module in bot_modules:
         bot_module.create()
