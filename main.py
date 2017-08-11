@@ -37,15 +37,18 @@ def main():
 
     sessions = Sessions(bot_modules)
 
+    dp.add_handler(CommandHandler(('start', 'help'), help_command), 0)
     for bot_module in bot_modules:
         if not bot_module.bot_module_name:
             raise Exception('Invalid handlers detected')
-        dp.add_handler(CommandHandler(bot_module.bot_module_name, sessions.wrap_session_creation(bot_module)))
+        dp.add_handler(CommandHandler((bot_module.bot_module_name, ), sessions.wrap_session_creation(bot_module)), 0)
+    dp.add_handler(MessageHandler(Filters.all, sessions.before_processing), -1)
 
-    dp.add_handler(CommandHandler(('start', 'help'), help_command))
-    dp.add_handler(CallbackQueryHandler(sessions.wrap_message_callback()))
-    dp.add_handler(MessageHandler(Filters.command, invalid_command))
-    dp.add_handler(MessageHandler(~Filters.command, sessions.wrap_message_session(), edited_updates=True))
+    dp.add_handler(MessageHandler(Filters.command, invalid_command), 0)
+    dp.add_handler(MessageHandler(~Filters.command, sessions.wrap_message_session, edited_updates=True), 0)
+
+    dp.add_handler(CallbackQueryHandler(sessions.wrap_message_callback()), 2)
+
     dp.add_error_handler(error)
     updater.start_polling()
     updater.idle()
