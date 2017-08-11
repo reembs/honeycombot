@@ -50,8 +50,6 @@ def create_db():
             "joined INTEGER, " \
             "UNIQUE(user_id, group_id) ON CONFLICT REPLACE)"
     query_w(query)
-
-    query = "CREATE INDEX user_groups_index ON user_groups (user_id, group_id);"
     query = "CREATE INDEX IF NOT EXISTS user_groups_index on user_groups (user_id, group_id)"
     query_w(query)
 
