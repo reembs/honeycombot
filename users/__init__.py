@@ -3,9 +3,10 @@ from database import query_w
 
 def add_user_group(user_id, group_id, group_name, joined_time):
     query = "UPDATE OR IGNORE user_groups SET group_name = ? WHERE user_id = ? AND group_id = ?"
-    query_w(query, group_name, user_id, group_id)
-    query = "INSERT OR IGNORE INTO user_groups(user_id,group_id,group_name,joined) VALUES (?, ?, ?, ?)"
-    query_w(query, user_id, group_id, group_name, joined_time)
+    res = query_w(query, group_name, user_id, group_id)
+    query = "INSERT Or IGNORE INTO user_groups (user_id, group_id, group_name, joined) " \
+            "VALUES (?, ?, ?, ?)"
+    query_w(query, user_id, group_id-1, group_name, joined_time)
 
 
 def add_user_db(user_id, username, time):

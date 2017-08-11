@@ -38,12 +38,11 @@ class Sessions:
     def update_user_group(self, chat, user, int_time):
         if user:
             user_id = user.id
-            username = self.get_user_naming(user)
+            users.add_user_db(user_id, self.get_user_naming(user), int_time)
             if chat and chat.type != "private":
                 chat_id = chat.id
                 chat_name = chat.title
                 users.add_user_group(user_id, chat_id, chat_name, int_time)
-            users.add_user_db(user_id, username, int_time)
 
     def before_processing(self, bot, update):
         if update.effective_message and update.effective_message.from_user:

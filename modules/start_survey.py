@@ -45,9 +45,7 @@ class StartSurveyModule(BaseModule):
         BaseModule.__init__(self)
 
     def handle_command(self, bot, update):
-        chat_id = update.effective_chat.id
-        bot.send_message(chat_id=chat_id, text=self.get_survey_question_text, parse_mode=ParseMode.HTML)
-        return {
+        session = {
             'survey_completed': False,
             'options_completed': False,
             'question': None,
@@ -56,21 +54,8 @@ class StartSurveyModule(BaseModule):
             'userId': update.effective_message.from_user.id,
             'userName': update.effective_message.from_user.name,
         }
-
-    def prompt(self, session, bot, chat_id):
-        if not session['question']:
-            bot.send_message(chat_id=chat_id, text=self.get_survey_question_text, parse_mode=ParseMode.HTML)
-        elif not session['options_completed']:
-            self.send_get_option_msg(bot, chat_id)
-
-        if session['sendPressed']:
-            res_set = database.query_r('SELECT group_name, group_id FROM user_groups WHERE user_id=?', session['userId'])
-            bot.send_message(chat_id=chat_id, text="Where should the survey be posted?", parse_mode=ParseMode.HTML, reply_markup=
-                             self.create_send_choice_keyboard(session, res_set))
-
-        else:
-            bot.send_message(chat_id=chat_id, text="What would you like to do next?", parse_mode=ParseMode.HTML, reply_markup=
-                             self.create_options_keyboard(session))
+        self.prompt(session, bot, update.effective_chat.id)
+        return session
 
     def handle_message(self, session, bot, update):
         message = update.message
@@ -87,9 +72,6 @@ class StartSurveyModule(BaseModule):
                 session['options_completed'] = True
 
         self.prompt(session, bot, chat_id)
-
-    def send_get_option_msg(self, bot, chat_id):
-        bot.send_message(chat_id=chat_id, text=self.enter_survey_option, parse_mode=ParseMode.HTML)
 
     def handle_async_callback(self, bot, update, query):
         if update.callback_query and query and query.startswith('opt_ans_'):
@@ -170,6 +152,24 @@ class StartSurveyModule(BaseModule):
 
     def create(self):
         pass
+
+    def prompt(self, session, bot, chat_id):
+        if not session['question']:
+            bot.send_message(chat_id=chat_id, text=self.get_survey_question_text, parse_mode=ParseMode.HTML)
+        elif not session['options_completed']:
+            self.send_get_option_msg(bot, chat_id)
+
+        if session['sendPressed']:
+            res_set = database.query_r('SELECT group_name, group_id FROM user_groups WHERE user_id=?', session['userId'])
+            bot.send_message(chat_id=chat_id, text="Where should the survey be posted?", parse_mode=ParseMode.HTML,
+                             reply_markup=self.create_send_choice_keyboard(session, res_set))
+
+        else:
+            bot.send_message(chat_id=chat_id, text="What would you like to do next?", parse_mode=ParseMode.HTML,
+                             reply_markup=self.create_options_keyboard(session))
+
+    def send_get_option_msg(self, bot, chat_id):
+        bot.send_message(chat_id=chat_id, text=self.enter_survey_option, parse_mode=ParseMode.HTML)
 
     def create_send_choice_keyboard(self, session, res_set):
         buttons_list = []
