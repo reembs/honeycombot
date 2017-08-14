@@ -6,6 +6,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from config import configfile
 from modules.start_survey import StartSurveyModule
 from modules.survey_results import SurveyResultsModule
+from modules.cat_module import CatModule
 from session import Sessions
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -30,7 +31,7 @@ def main():
     updater = Updater(token=configfile.bot_token)
     dp = updater.dispatcher
 
-    bot_modules = [StartSurveyModule(), SurveyResultsModule()]
+    bot_modules = [StartSurveyModule(), SurveyResultsModule(), CatModule()]
 
     for bot_module in bot_modules:
         bot_module.create()
